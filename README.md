@@ -20,6 +20,12 @@ which is important for Kiosk mode.
 - It hides the negative prompt from the UI, but keeps it in the generated images.
 - Enlarges the important texts 2x so people can see it better.
 
+The CSS for hiding the original footer and disabling on-change link in js are enabled together with the extension.
+Setting custom html footer and hiding the negative prompt is toggleable by config parameters.
+
+If needed, the js and css can be also toggleable, because it can be added as gradio element before or after
+the original css, making it more configurable.
+
 It also adds feature for easy sharing of generated images. This extension provides functionality for generating QR code
 for every generated image, next to the image, which points to the image path in output directory under some URL.
 If you run basic webserver for serving static content inside the `outputs/txt2img-images`, the QR code will 
