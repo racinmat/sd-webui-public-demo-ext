@@ -99,3 +99,10 @@ def on_before_component(component, **kwargs):
 
 
 script_callbacks.on_before_component(on_before_component)
+
+# todo: remaining to migrate
+#   qr code
+#   the output panel to new row
+#   adding return to homepage button
+#   adding qrcode requirement, installing it
+#   trying it out, installing to new dir after everything
