@@ -83,8 +83,11 @@ xformers: {xformers_version}
 &#x2000;•&#x2000;
 gradio: {gr.__version__}
 &#x2000;•&#x2000;
-checkpoint: <a id="sd_checkpoint_hash">N/A</a>
+checkpoint: <span id="sd_checkpoint_hash">N/A</span>
 """
+# because of https://github.com/gradio-app/gradio/issues/3667 I avoid using a tag at all
+# and even when it gets fixed, having it as span is better, because even the js adding some link does not make it
+# clickable
 
 
 def on_before_component(component, **kwargs):
@@ -96,6 +99,7 @@ def on_before_component(component, **kwargs):
         footer = shared.html(osp.relpath(os.path.join(pth, "footer.html"), osp.join(script_path, "html")))
         footer = footer.format(versions=versions_html())
         gr.HTML(footer, elem_id="no_link_footer")
+        # we have the original footer component here, but it seems there is no way to change the value
 
 
 script_callbacks.on_before_component(on_before_component)
