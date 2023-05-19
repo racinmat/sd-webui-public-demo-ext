@@ -28,11 +28,14 @@ class Script(scripts.Script):
     def show(self, is_img2img):
         return scripts.AlwaysVisible
 
-    def ui(self, is_img2img):
-        pass
-
-    def process(self, p, *args):
-        pass
+    def postprocess(self, p, processed, *args):
+        # this hides negative front
+        negative_prompt = p.negative_prompt
+        for i, text in enumerate(processed.infotexts):
+            processed.infotexts[i] = text.replace(f'Negative prompt: {negative_prompt}', '')
+        processed.info = processed.info.replace(f'Negative prompt: {negative_prompt}', '')
+        processed.negative_prompt = ''
+        processed.all_negative_prompts = ['' for _ in processed.all_negative_prompts]
 
 
 shared.options_templates.update(shared.options_section(('ui', "User interface"), {
