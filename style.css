@@ -1,0 +1,27 @@
+#txt2img_prompt > label:nth-child(1) > textarea:nth-child(2) {
+    font-size: 28px;
+}
+#tabs > div:nth-child(1) > button:nth-child(1) {
+    font-size: 32px;
+}
+#txt2img_generate {
+    font-size: 24px;
+}
+/* replace original footer with ours */
+
+#footer {
+    display: none !important;
+}
+
+#no_link_footer{
+    text-align: center;
+}
+
+#no_link_footer div{
+    display: inline-block;
+}
+
+#no_link_footer .versions{
+    font-size: 85%;
+    opacity: 0.85;
+}
