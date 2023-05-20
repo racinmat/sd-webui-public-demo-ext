@@ -2,9 +2,12 @@ import os
 import sys
 import os.path as osp
 
+import qrcode
+
 import modules.scripts as scripts
 import gradio as gr
 import logging
+from gradio.context import Context
 
 from modules import shared, script_callbacks
 from modules.paths_internal import script_path
@@ -42,16 +45,31 @@ class Script(scripts.Script):
             processed.negative_prompt = ''
             processed.all_negative_prompts = ['' for _ in processed.all_negative_prompts]
 
+        if shared.opts.add_qr_code:
+            # I'm adding images to array I iterate to, better to create new one and replace
+            new_processed_images = processed.images[:processed.index_of_first_image]
+            for i, img in enumerate(processed.images[processed.index_of_first_image:]):
+                image_path = img.already_saved_as.replace(p.outpath_samples, '')
+                qr_link = f'{shared.opts.static_server_uri}{image_path.replace(os.path.sep, "/")}'
+                qr_img = qrcode.make(qr_link).get_image()
+                new_processed_images.append(img)
+                new_processed_images.append(qr_img)
+            processed.images = new_processed_images
+
 
 shared.options_templates.update(shared.options_section(('ui', "User interface"), {
-    "hide_negative_prompt": shared.OptionInfo(False,
+    "hide_negative_prompt": shared.OptionInfo(True,
                                               "if true, will hide negative prompt from the text info under images in UI"),
-    "add_qr_code": shared.OptionInfo(False,
+    "add_qr_code": shared.OptionInfo(True,
                                      "If true, a qr code will be generated, pointing to the image on static web server"),
     "static_server_uri": shared.OptionInfo("http://localhost:7860/file=outputs/txt2img-images",
                                            "URL of the prefix of the URI, directory with current date and image name will be appended after this."),
-    "hide_footer_links": shared.OptionInfo(False,
+    "hide_footer_links": shared.OptionInfo(True,
                                            "if true, will replace the footer with one without links"),
+    "wide_gallery": shared.OptionInfo(True,
+                                      "if true, will put gallery to new row, making it wide"),
+    "add_homepage_button": shared.OptionInfo(True,
+                                             "if true, will add the return to homepage after the generate button"),
 
 }))
 
@@ -85,6 +103,8 @@ gradio: {gr.__version__}
 &#x2000;•&#x2000;
 checkpoint: <span id="sd_checkpoint_hash">N/A</span>
 """
+
+
 # because of https://github.com/gradio-app/gradio/issues/3667 I avoid using a tag at all
 # and even when it gets fixed, having it as span is better, because even the js adding some link does not make it
 # clickable
@@ -92,21 +112,63 @@ checkpoint: <span id="sd_checkpoint_hash">N/A</span>
 
 def on_before_component(component, **kwargs):
     # insert custom footer and hide the original one
-    if (not isinstance(component, gr.components.HTML)) or (kwargs['elem_id'] != 'footer'):
+    is_footer_html = isinstance(component, gr.components.HTML) and kwargs['elem_id'] == 'footer'
+    is_output_gallery = isinstance(component, gr.components.Gallery) and kwargs['elem_id'] == 'txt2img_gallery'
+    if not any((is_footer_html, is_output_gallery)):
         return
-    # just creating my component
-    if shared.opts.hide_footer_links:
+    # adding my own footer
+    elif is_footer_html and shared.opts.hide_footer_links:
         footer = shared.html(osp.relpath(os.path.join(pth, "footer.html"), osp.join(script_path, "html")))
         footer = footer.format(versions=versions_html())
         gr.HTML(footer, elem_id="no_link_footer")
+        # I can't do this, because I can't mutate the kwargs like this
+        # kwargs['visible'] = False
+        # kwargs['value'] = ''
         # we have the original footer component here, but it seems there is no way to change the value
+    elif is_output_gallery and shared.opts.wide_gallery:
+        the_row = Context.block.parent.parent
+        if not isinstance(the_row, gr.Row):
+            raise Exception("Something is wrong with the layout, Row expected")
+        cur_block = Context.block
+        the_row.__exit__()
+        column_idx, gallery_column = [(i, c) for i, c in enumerate(the_row.children) if c.elem_id == 'txt2img_results'][
+            0]
+        del the_row.children[column_idx]
+        with gr.Row().style(
+            equal_height=False):  # adding new row so all the hidden stuff would be in the same hidden row
+            Context.block.add(gallery_column)
+        Context.block = cur_block
+
+
+def on_after_component(component, **kwargs):
+    # insert custom footer and hide the original one
+    is_txt2img_generate_button = isinstance(component, gr.components.Button) and kwargs['elem_id'] == 'txt2img_generate'
+    is_footer_html = isinstance(component, gr.components.HTML) and kwargs['elem_id'] == 'footer'
+    if not any((is_txt2img_generate_button, is_footer_html)):
+        return
+    # adding my own button
+    # manually closing the row and creating new one, and adding the button there
+    elif is_txt2img_generate_button and shared.opts.add_homepage_button:
+        component.parent.__exit__()
+        id_part = 'txt2img'
+        with gr.Row(elem_id=f"{id_part}_generate_box", elem_classes="reload-box"):
+            # copied from this line in the settings
+            # restart_gradio = gr.Button(value='Reload UI', variant='primary', elem_id="settings_restart_gradio")
+            reload_page = gr.Button('Return to homepage', elem_id=f"{id_part}_reload", variant='secondary')
+            reload_page.click(
+                fn=lambda: None,
+                _js='reload_page',
+                inputs=[],
+                outputs=[],
+            )
+    elif is_footer_html and shared.opts.hide_footer_links:
+        component.visible = False
+        component.value = ''
 
 
 script_callbacks.on_before_component(on_before_component)
+script_callbacks.on_after_component(on_after_component)
 
 # todo: remaining to migrate
-#   qr code
 #   the output panel to new row
-#   adding return to homepage button
-#   adding qrcode requirement, installing it
 #   trying it out, installing to new dir after everything
