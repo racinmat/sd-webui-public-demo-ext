@@ -121,11 +121,28 @@ def on_before_component(component, **kwargs):
         footer = shared.html(osp.relpath(os.path.join(pth, "footer.html"), osp.join(script_path, "html")))
         footer = footer.format(versions=versions_html())
         gr.HTML(footer, elem_id="no_link_footer")
-        # I can't do this, because I can't mutate the kwargs like this
+        # I can't do this, because I can't mutate the kwargs like this in python, they are passed by value
         # kwargs['visible'] = False
         # kwargs['value'] = ''
-        # we have the original footer component here, but it seems there is no way to change the value
     elif is_output_gallery and shared.opts.wide_gallery:
+        # this is kinda dark magic, because I was to mutate the component free from
+        # row
+        #  column
+        #    ui controls
+        #  column
+        #    group
+        #      gallery
+        # into
+        # row
+        #  column
+        #   ui controls
+        # row
+        #  column
+        #   group
+        #    gallery
+        # , but I do it from within the gallery, so to get to the row, I need to go 2 parents up
+        # and then close it, create a new one and move the column from the old one to the new one
+        # this all while keeping the current scope, so I need to set the original context block at the end
         the_row = Context.block.parent.parent
         if not isinstance(the_row, gr.Row):
             raise Exception("Something is wrong with the layout, Row expected")
@@ -134,8 +151,8 @@ def on_before_component(component, **kwargs):
         column_idx, gallery_column = [(i, c) for i, c in enumerate(the_row.children) if c.elem_id == 'txt2img_results'][
             0]
         del the_row.children[column_idx]
-        with gr.Row().style(
-            equal_height=False):  # adding new row so all the hidden stuff would be in the same hidden row
+        # adding new row so all the hidden stuff would be in the same hidden row
+        with gr.Row().style(equal_height=False):
             Context.block.add(gallery_column)
         Context.block = cur_block
 
@@ -162,13 +179,15 @@ def on_after_component(component, **kwargs):
                 outputs=[],
             )
     elif is_footer_html and shared.opts.hide_footer_links:
+        # just setting the visible and value didn't hide the component, for some reason, the html was still rendered
+        # but the unrender helped
         component.visible = False
         component.value = ''
+        component.unrender()
 
 
 script_callbacks.on_before_component(on_before_component)
 script_callbacks.on_after_component(on_after_component)
 
 # todo: remaining to migrate
-#   the output panel to new row
 #   trying it out, installing to new dir after everything
